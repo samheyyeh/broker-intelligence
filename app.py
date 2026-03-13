@@ -19,7 +19,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app, origins=["https://samheyyeh.github.io", "http://localhost:8080", "http://localhost:5050", "null"])
+CORS(app, origins="*", supports_credentials=False)
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 PASSPHRASE = os.environ.get("PASSPHRASE", "")
