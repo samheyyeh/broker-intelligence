@@ -306,7 +306,7 @@ def index():
 
 
 
-@app.route("/api/auth", methods=["POST"])
+@app.route("/api/auth", methods=["POST", "OPTIONS"])
 def auth():
     if not PASSPHRASE:
         return jsonify({"ok": False, "error": "PASSPHRASE env var not set on server"}), 500
@@ -314,7 +314,8 @@ def auth():
     body = request.get_json(silent=True) or {}
     provided = body.get("password", "")
 
-    if secrets.compare_digest(provided, PASSPHRASE):
+    # Strip whitespace in case env var was set with accidental spaces/newlines
+    if secrets.compare_digest(provided.strip(), PASSPHRASE.strip()):
         token = secrets.token_hex(32)
         _valid_tokens.add(token)
         return jsonify({"ok": True, "token": token})
