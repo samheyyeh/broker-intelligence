@@ -308,13 +308,21 @@ def index():
 
 @app.route("/api/auth", methods=["POST", "OPTIONS"])
 def auth():
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        from flask import make_response
+        res = make_response()
+        res.headers["Access-Control-Allow-Origin"] = "*"
+        res.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return res, 204
+
     if not PASSPHRASE:
         return jsonify({"ok": False, "error": "PASSPHRASE env var not set on server"}), 500
 
     body = request.get_json(silent=True) or {}
     provided = body.get("password", "")
 
-    # Strip whitespace in case env var was set with accidental spaces/newlines
     if secrets.compare_digest(provided.strip(), PASSPHRASE.strip()):
         token = secrets.token_hex(32)
         _valid_tokens.add(token)
