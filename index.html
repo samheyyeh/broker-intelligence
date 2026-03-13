@@ -303,7 +303,7 @@
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const API_BASE = "https://broker-intelligence-api.onrender.com";
+const API_BASE = "http://localhost:5050"; // Flask backend
 
 const BROKERS = [
   { id:"AJG", name:"Arthur J. Gallagher", color:"#E8A030" },
@@ -481,7 +481,7 @@ async function fetchNews() {
     showStatus('', '');
     renderBrokers(); renderCats(); renderNews();
   } catch(err) {
-    showStatus('Backend error: ' + err.message + ' — is app.py running on :5050?', 'error');
+    showStatus('Backend error: ' + err.message, 'error');
   } finally {
     setLoading(false);
   }
@@ -491,22 +491,42 @@ async function fetchNews() {
 renderBrokers(); renderCats();
 // fetchNews() called by gate after auth
 
-// ── Password Gate ─────────────────────────────────────────────────────────────
-const PASSPHRASE = "gocubsgo";
-const SESSION_KEY = "bi_auth";
+// ── Password Gate (server-side verification) ──────────────────────────────────
+const SESSION_KEY = "bi_token";
 
-function checkPassword() {
+async function checkPassword() {
   const val = document.getElementById('gateInput').value;
   const inp = document.getElementById('gateInput');
-  if (val === PASSPHRASE) {
-    sessionStorage.setItem(SESSION_KEY, "1");
-    document.getElementById('gate').classList.add('hidden');
-    fetchNews();
-  } else {
-    inp.classList.add('error');
-    document.getElementById('gateErr').textContent = 'Incorrect passphrase. Try again.';
-    setTimeout(() => inp.classList.remove('error'), 400);
-    inp.value = '';
+  const errEl = document.getElementById('gateErr');
+  const btn = document.querySelector('.gate-btn');
+
+  if (!val) return;
+  btn.textContent = 'CHECKING...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: val })
+    });
+    const data = await res.json();
+
+    if (data.ok && data.token) {
+      sessionStorage.setItem(SESSION_KEY, data.token);
+      document.getElementById('gate').classList.add('hidden');
+      fetchNews();
+    } else {
+      inp.classList.add('error');
+      errEl.textContent = 'Incorrect passphrase. Try again.';
+      setTimeout(() => inp.classList.remove('error'), 400);
+      inp.value = '';
+    }
+  } catch (e) {
+    errEl.textContent = 'Could not reach server. Try again.';
+  } finally {
+    btn.textContent = 'UNLOCK →';
+    btn.disabled = false;
   }
 }
 
@@ -514,8 +534,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('gateInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') checkPassword();
   });
-  if (sessionStorage.getItem(SESSION_KEY) === "1") {
+  // If valid token already in session, skip gate
+  if (sessionStorage.getItem(SESSION_KEY)) {
     document.getElementById('gate').classList.add('hidden');
+    fetchNews();
   }
 });
 

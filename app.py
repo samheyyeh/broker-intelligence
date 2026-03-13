@@ -7,6 +7,7 @@ import json
 import hashlib
 import os
 import re
+import secrets
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -18,9 +19,12 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://samheyyeh.github.io", "http://localhost:8080", "http://localhost:5050", "null"])
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+PASSPHRASE = os.environ.get("PASSPHRASE", "")
+# Simple in-memory valid token store (resets on redeploy, which is fine)
+_valid_tokens: set = set()
 
 # ─── Broker Config ─────────────────────────────────────────────────────────────
 
@@ -299,6 +303,23 @@ def get_news(query=""):
 @app.route("/")
 def index():
     return jsonify({"ok": True, "message": "API running. Use /api/news or /api/health."})
+
+
+
+@app.route("/api/auth", methods=["POST"])
+def auth():
+    if not PASSPHRASE:
+        return jsonify({"ok": False, "error": "PASSPHRASE env var not set on server"}), 500
+
+    body = request.get_json(silent=True) or {}
+    provided = body.get("password", "")
+
+    if secrets.compare_digest(provided, PASSPHRASE):
+        token = secrets.token_hex(32)
+        _valid_tokens.add(token)
+        return jsonify({"ok": True, "token": token})
+    else:
+        return jsonify({"ok": False, "error": "Invalid password"}), 401
 
 
 @app.route("/api/news")
