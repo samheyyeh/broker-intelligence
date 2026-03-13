@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insurance Broker Intelligence</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #070D18;
+    --surface: #0D1624;
+    --border: #1A2E47;
+    --blue: #3B9EFF;
+    --green: #00C896;
+    --red: #FF4D4D;
+    --amber: #F59E0B;
+    --text: #C8D8EE;
+    --muted: #4A6A8A;
+    --dim: #1E3A5A;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  header {
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0A1525 0%, var(--bg) 100%);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+    display: inline-block; margin-right: 8px;
+    animation: blink 2s infinite;
+  }
+  .status-dot.loading { background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: blink 0.5s infinite; }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--blue); text-transform: uppercase; }
+
+  h1 { font-size: 22px; font-weight: 700; color: #EAF4FF; margin-top: 4px; line-height: 1.2; }
+  h1 span { color: var(--blue); }
+
+  .search-row { display: flex; gap: 8px; margin-top: 14px; }
+  .search-row input {
+    flex: 1; padding: 11px 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none;
+  }
+  .search-row input::placeholder { color: var(--muted); }
+  .search-row input:focus { border-color: var(--blue); }
+
+  .btn {
+    padding: 11px 18px; border-radius: 8px;
+    border: 1px solid var(--blue); background: rgba(59,158,255,0.15);
+    color: var(--blue); font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 1px; cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn:active { opacity: 0.7; }
+
+  .section { padding: 16px; }
+
+  .broker-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .broker-scroll::-webkit-scrollbar { display: none; }
+
+  .broker-chip {
+    flex-shrink: 0; padding: 8px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer; text-align: center; min-width: 80px;
+  }
+  .broker-chip.active { border-color: var(--blue); background: rgba(59,158,255,0.1); }
+  .broker-chip .ticker { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: #EAF4FF; }
+  .broker-chip .score { font-family: 'DM Mono', monospace; font-size: 11px; margin-top: 2px; }
+  .broker-chip .bar { height: 2px; border-radius: 1px; margin-top: 6px; background: var(--dim); overflow: hidden; }
+  .broker-chip .bar-fill { height: 100%; border-radius: 1px; transition: width 0.4s; }
+
+  .cat-scroll { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .cat-scroll::-webkit-scrollbar { display: none; }
+  .cat-pill {
+    flex-shrink: 0; padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-size: 12px; cursor: pointer;
+    font-family: 'DM Mono', monospace;
+  }
+  .cat-pill.active { border-color: var(--blue); color: var(--blue); background: rgba(59,158,255,0.1); }
+
+  .news-list { display: flex; flex-direction: column; gap: 10px; padding: 0 16px; }
+
+  .news-card {
+    border-radius: 10px; padding: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer; position: relative; overflow: hidden;
+    border-left: 3px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .news-card:active { opacity: 0.85; }
+
+  .news-card.impact-HP { border-left-color: var(--green); }
+  .news-card.impact-MP { border-left-color: #7FD4B0; }
+  .news-card.impact-N  { border-left-color: var(--muted); }
+  .news-card.impact-MN { border-left-color: var(--amber); }
+  .news-card.impact-HN { border-left-color: var(--red); }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+
+  .card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .tag {
+    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    padding: 2px 7px; border-radius: 4px;
+  }
+  .tag-urgency-BREAKING { background: var(--red); color: #fff; }
+  .tag-urgency-TODAY { background: var(--amber); color: #000; }
+  .tag-urgency-THIS_WEEK { background: var(--dim); color: var(--blue); }
+  .tag-urgency-MONITOR { background: #111C2A; color: var(--muted); border: 1px solid var(--border); }
+  .tag-cat { background: #111C2A; color: var(--muted); border: 1px solid var(--border); }
+  .tag-broker { border: 1px solid; }
+
+  .card-headline { font-size: 14px; font-weight: 600; color: #EAF4FF; line-height: 1.4; margin-bottom: 6px; }
+  .card-summary { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .card-source { font-size: 10px; color: #2A4A6A; margin-top: 8px; font-family: 'DM Mono', monospace; }
+
+  .score-badge {
+    flex-shrink: 0; width: 48px; text-align: center;
+    padding: 8px 4px; border-radius: 6px;
+  }
+  .score-badge .num { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; }
+  .score-badge .lbl { font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: 1px; margin-top: 2px; }
+
+  .drawer-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  }
+  .drawer-overlay.open { display: flex; align-items: flex-end; }
+
+  .drawer {
+    background: #0D1624; border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 20px 16px 40px; width: 100%;
+    max-height: 85vh; overflow-y: auto;
+  }
+
+  .drawer-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+
+  .drawer h2 { font-size: 16px; color: #EAF4FF; line-height: 1.4; margin-bottom: 16px; }
+
+  .impact-block { padding: 12px; background: #070D18; border-radius: 8px; margin-bottom: 14px; }
+  .impact-block .big-score { font-family: 'DM Mono', monospace; font-size: 32px; font-weight: 500; }
+  .impact-block p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 8px; }
+
+  .detail-section { margin-bottom: 14px; }
+  .detail-label { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 3px; margin-bottom: 8px; }
+  .detail-item { padding: 8px 12px; border-radius: 6px; font-size: 12px; line-height: 1.5; margin-bottom: 6px; }
+  .detail-item.risk { background: rgba(255,77,77,0.07); border: 1px solid rgba(255,77,77,0.15); color: #C09090; }
+  .detail-item.opp  { background: rgba(0,200,150,0.07); border: 1px solid rgba(0,200,150,0.15); color: #90C0A0; }
+
+  .broker-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .source-link {
+    display: inline-block; margin-top: 12px;
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--blue);
+    text-decoration: none; border: 1px solid rgba(59,158,255,0.3);
+    padding: 6px 12px; border-radius: 6px;
+  }
+  .source-link:hover { background: rgba(59,158,255,0.1); }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+
+  .status-bar {
+    margin: 12px 16px; padding: 10px 14px; border-radius: 8px;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .status-bar.info { background: rgba(59,158,255,0.07); border: 1px solid rgba(59,158,255,0.2); color: var(--blue); }
+  .status-bar.error { background: rgba(255,77,77,0.07); border: 1px solid rgba(255,77,77,0.2); color: var(--red); }
+
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+  .meta-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .meta-row span { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="label"><span class="status-dot" id="dot"></span>Intelligence Platform</div>
+  <h1>Broker <span>Intelligence</span></h1>
+  <div class="search-row">
+    <input id="searchInput" type="text" placeholder="Search news topics..." />
+    <button class="btn" id="refreshBtn" onclick="fetchNews()">SCAN</button>
+  </div>
+</header>
+
+<div class="section" style="padding-bottom:0">
+  <div class="label" style="margin-bottom:10px">Brokers</div>
+  <div class="broker-scroll" id="brokerScroll"></div>
+</div>
+
+<div class="section" style="padding-bottom:0; margin-top:12px">
+  <div class="cat-scroll" id="catScroll"></div>
+</div>
+
+<div id="statusBar"></div>
+<div class="news-list" id="newsList"></div>
+<div class="empty" id="emptyState" style="display:none">No stories found. Try refreshing.</div>
+
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
+  <div class="drawer" id="drawer"></div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const API_BASE = "http://localhost:5050"; // Flask backend
+
+const BROKERS = [
+  { id:"AJG", name:"Arthur J. Gallagher", color:"#E8A030" },
+  { id:"AON", name:"Aon plc",             color:"#3B9EFF" },
+  { id:"MMC", name:"Marsh McLennan",       color:"#FF4D4D" },
+  { id:"WTW", name:"WTW",                  color:"#A855F7" },
+  { id:"BRO", name:"Brown & Brown",        color:"#00C896" },
+  { id:"HIG", name:"Hartford Financial",   color:"#06B6D4" },
+];
+const CATS = ["All","M&A","Regulatory","Earnings","Leadership","Market","Technology","Litigation"];
+const IMPACT_COLORS = { HIGH_POSITIVE:"#00C896", MODERATE_POSITIVE:"#7FD4B0", NEUTRAL:"#4A6A8A", MODERATE_NEGATIVE:"#F59E0B", HIGH_NEGATIVE:"#FF4D4D" };
+const IMPACT_CLASS  = { HIGH_POSITIVE:"HP", MODERATE_POSITIVE:"MP", NEUTRAL:"N", MODERATE_NEGATIVE:"MN", HIGH_NEGATIVE:"HN" };
+
+let allNews = [];
+let selBroker = "All";
+let selCat = "All";
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+
+function setLoading(on) {
+  document.getElementById('dot').className = on ? 'status-dot loading' : 'status-dot';
+  document.getElementById('refreshBtn').disabled = on;
+  document.getElementById('refreshBtn').textContent = on ? '...' : 'SCAN';
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('statusBar');
+  if (!msg) { el.innerHTML = ''; return; }
+  const icon = type === 'error' ? '✕' : '<span class="spin">⟳</span>';
+  el.innerHTML = `<div class="status-bar ${type}">${icon} ${msg}</div>`;
+}
+
+function renderBrokers() {
+  const scores = BROKERS.map(b => {
+    const rel = allNews.filter(n => n.affectedBrokers?.includes(b.id));
+    const avg = rel.length ? rel.reduce((s,n) => s + (n.impactScore||0), 0) / rel.length : 0;
+    return { ...b, score: avg, count: rel.length };
+  });
+  document.getElementById('brokerScroll').innerHTML = scores.map(b => {
+    const active = selBroker === b.id;
+    const sc = b.score;
+    const col = sc > 2 ? '#00C896' : sc < -2 ? '#FF4D4D' : '#4A6A8A';
+    const pct = Math.min(Math.abs(sc) * 10, 100);
+    return `<div class="broker-chip ${active?'active':''}" onclick="filterBroker('${b.id}')">
+      <div class="ticker" style="color:${active?b.color:'#EAF4FF'}">${b.id}</div>
+      <div class="score" style="color:${col}">${sc>0?'+':''}${sc.toFixed(1)}</div>
+      <div class="bar"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderCats() {
+  document.getElementById('catScroll').innerHTML = CATS.map(c =>
+    `<button class="cat-pill ${selCat===c?'active':''}" onclick="filterCat('${c}')">${c}</button>`
+  ).join('');
+}
+
+function getFiltered() {
+  return allNews.filter(n => {
+    const bOk = selBroker === 'All' || n.affectedBrokers?.includes(selBroker);
+    const cOk = selCat === 'All' || n.category === selCat;
+    return bOk && cOk;
+  });
+}
+
+function impactColor(label) { return IMPACT_COLORS[label] || '#4A6A8A'; }
+function impactClass(label) { return 'impact-' + (IMPACT_CLASS[label] || 'N'); }
+
+function renderNews() {
+  const list = getFiltered();
+  const el = document.getElementById('newsList');
+  const empty = document.getElementById('emptyState');
+  if (!list.length) { el.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  el.innerHTML = list.map(item => {
+    const ic = impactColor(item.impactLabel);
+    const sc = item.impactScore || 0;
+    return `<div class="news-card ${impactClass(item.impactLabel)}" onclick="openDrawer('${item.id}')">
+      <div class="card-meta">
+        <span class="tag tag-urgency-${item.urgency||'MONITOR'}">${item.urgency||'MONITOR'}</span>
+        <span class="tag tag-cat">${item.category||''}</span>
+        ${(item.affectedBrokers||[]).slice(0,3).map(bid => {
+          const b = BROKERS.find(x=>x.id===bid);
+          return `<span class="tag tag-broker" style="color:${b?.color||'#888'};border-color:${b?.color||'#888'}44">${bid}</span>`;
+        }).join('')}
+      </div>
+      <div class="card-top">
+        <div style="flex:1">
+          <div class="card-headline">${item.headline}</div>
+          <div class="card-summary">${item.summary}</div>
+          <div class="card-source">${item.source||''} · ${item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : 'Recent'}</div>
+        </div>
+        <div class="score-badge" style="background:${ic}18;border:1px solid ${ic}44">
+          <div class="num" style="color:${ic}">${sc>0?'+':''}${sc}</div>
+          <div class="lbl" style="color:${ic}">IMPACT</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openDrawer(id) {
+  const item = allNews.find(n => n.id === id);
+  if (!item) return;
+  const ic = impactColor(item.impactLabel);
+  const sc = item.impactScore || 0;
+  document.getElementById('drawer').innerHTML = `
+    <div class="drawer-handle"></div>
+    <div class="meta-row">
+      <span class="tag tag-urgency-${item.urgency||'MONITOR'}">${item.urgency||'MONITOR'}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:#2A4A6A">${item.source||''}</span>
+    </div>
+    <h2>${item.headline}</h2>
+    <div class="impact-block">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="big-score" style="color:${ic}">${sc>0?'+':''}${sc}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;padding:4px 10px;border-radius:4px;background:${ic}22;color:${ic}">${(item.impactLabel||'').replace(/_/g,' ')}</div>
+      </div>
+      <p>${item.impactReasoning||''}</p>
+    </div>
+    <div class="detail-section">
+      <div class="detail-label" style="color:#3B9EFF">AFFECTED FIRMS</div>
+      <div class="broker-tags">
+        ${(item.affectedBrokers||[]).map(bid => {
+          const b = BROKERS.find(x=>x.id===bid);
+          return `<span class="tag tag-broker" style="font-size:12px;padding:5px 12px;color:${b?.color||'#888'};border-color:${b?.color||'#888'}55;border:1px solid;border-radius:6px">${bid} — ${b?.name||bid}</span>`;
+        }).join('')}
+      </div>
+    </div>
+    ${(item.keyRisks||[]).length ? `
+    <div class="detail-section">
+      <div class="detail-label" style="color:#FF4D4D">▼ KEY RISKS</div>
+      ${item.keyRisks.map(r => `<div class="detail-item risk">${r}</div>`).join('')}
+    </div>` : ''}
+    ${(item.keyOpportunities||[]).length ? `
+    <div class="detail-section">
+      <div class="detail-label" style="color:#00C896">▲ OPPORTUNITIES</div>
+      ${item.keyOpportunities.map(o => `<div class="detail-item opp">${o}</div>`).join('')}
+    </div>` : ''}
+    ${item.link ? `<a class="source-link" href="${item.link}" target="_blank" rel="noopener">↗ READ FULL ARTICLE</a>` : ''}
+    <div style="font-family:'DM Mono',monospace;font-size:10px;color:#2A4A6A;margin-top:12px">
+      ${item.publishedAt ? new Date(item.publishedAt).toLocaleString() : 'Recent'}
+    </div>
+  `;
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+
+function closeDrawer(e) {
+  if (e.target === document.getElementById('drawerOverlay'))
+    document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+function filterBroker(id) { selBroker = selBroker === id ? 'All' : id; renderBrokers(); renderNews(); }
+function filterCat(cat)   { selCat = cat; renderCats(); renderNews(); }
+
+// ── API Call ──────────────────────────────────────────────────────────────────
+
+async function fetchNews() {
+  const q = document.getElementById('searchInput').value.trim();
+  setLoading(true);
+  showStatus('Scanning intelligence feeds...', 'info');
+
+  try {
+    const url = `${API_BASE}/api/news${q ? '?q=' + encodeURIComponent(q) : ''}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+
+    if (!data.ok) throw new Error(data.error || 'Unknown error');
+
+    const ids = new Set(allNews.map(n => n.id));
+    const fresh = data.items.filter(n => !ids.has(n.id));
+    allNews = [...fresh, ...allNews].slice(0, 60);
+
+    showStatus('', '');
+    renderBrokers(); renderCats(); renderNews();
+  } catch(err) {
+    showStatus('Backend error: ' + err.message + ' — is app.py running on :5050?', 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// Init
+renderBrokers(); renderCats();
+fetchNews();
+</script>
+</body>
+</html>
